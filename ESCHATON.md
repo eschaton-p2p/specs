@@ -18,17 +18,28 @@ This is a very rough draft in the spirit of [Readme Driven Development][RDD]. Mu
 [RDD]: http://tom.preston-werner.com/2010/08/23/readme-driven-development.html
 ## Motivation
 
-A blockchain is a great timestamping and consensus mechanism, but data storage in the blockchain is not scalable as each full node must process all of the data. Existing peer to peer networks for general computation rely on tit-for-tat resource barter or, worse, tracking network contributions in a blockchain. Using off-chain contracts, a friend-to-friend network similar to GNUnet is proposed which permits many network services to be distributed, scaled, commoditized, and open sourced. Essentially, "Bitcoin 2.0" features that exist mostly off the blockchain for scalability and privacy.
+Bitcoin's blockchain is a great timestamping and consensus mechanism. However, it has the following disadvantages:
+
+* Instant payments suitable for point of sale require either 0-confirmation transactions, which are vulnerable to double spend, or centralization-increasing green addresses
+* Insufficient blockchain scalability for trillions of automated micropayments per day
+* Traceability of payments on the blockchain can reduce privacy for users
+* Blockchain use for advanced contracts is also subject to scalability limitations
+* Trustless exchanges - including between Bitcoin, altcoins, colored coins, and in the future, side chains - require multiple on-chain transactions, reducing scalability and speed of trading
 
 ### Project Goals
 
-This project aims to build a network primarily on top of Bitcoin, though it's simple to add support for other similar cryptocurrency networks. The intent is to move as much trade as possible off the blockchain for privacy and scalability while maintaining a no- or minimal-trust environment. Support for advanced contracts that can be maintained off the blockchain is described below.
+This project aims to build a network primarily on top of Bitcoin and eventually side chains, though it's simple to add support for other similar cryptocurrency networks. The intent is to move as much trade as possible off the blockchain for privacy and scalability while maintaining a no- or minimal-trust environment. Support for advanced contracts that can be maintained off the blockchain is described. The network will have the following features:
+
+* Friend-to-friend, instant, off-blockchain, trustless payments of arbitrary size with optional escrow, composable into distributed inter-blockchain instant payments and exchanges between arbitrary parties
+* Friend-to-friend, instant, off-blockchain, trustless bets composable into distributed derivatives and prediction markets, crowdfunding with performance bonds, insurance, and more
+* Metered network services bought using micropayments, composable into meshnets, mixnets, microgrids, social networks, grid computing networks, and more
+* A modular design permitting alternative implementations of various services as new innovations occur, such as potentially improving the DHT with a proof of storage based side chain
 
 ### Overall Design
 
 The network will have a friend-to-friend financial structure, while the connectivity structure may be more freeform. 
 
-The financial connections are minimal trust contracts settled on the Bitcoin (or altcoin; for the rest of the white paper, this is assumed) blockchain. However, they're maintained for as long as years off chain, minimizing blockchain resource usage.
+The financial connections are minimal trust contracts settled on a blockchain (Bitcoin, a side chain, or an alt coin's blockchain). However, they're maintained for as long as years off chain, minimizing blockchain resource usage.
 
 The communication connectivity can be varied: through the Internet, local Wi-Fi, Bluetooth, cellular networks, etc. The aim is to create a survivable, sustainable, scalable and highly available system to prevent interruptions in communication and trade while guarding privacy and reducing censorship.
 
@@ -40,7 +51,7 @@ The traditional off chain trade contract functions as [previously described by M
 [MICRO]: https://en.bitcoin.it/wiki/Contracts#Example_7:_Rapidly-adjusted_.28micro.29payments_to_a_pre-determined_party
 The parameters of the contract can be modified to include risk deposits, maximum payment size, and other rules to enforce incentives to play by the rules. These rules are enforced by each party to the contract in refusing to countersign any version of the refund transaction which doesn't follow the rules.
 
-As an example, consider a situaion where Alice and Bob would like to open a 100 mBTC trade channel between themselves, with each contributing half to start. The first thing they would do is create a contract transaction:
+As an example, consider a situation where Alice and Bob would like to open a 100 mBTC trade channel between themselves, with each contributing half to start. The first thing they would do is create a contract transaction:
 
 ![Contract Transaction](http://aakselrod.github.io/contract.svg "Contract Transaction")
 
@@ -50,7 +61,7 @@ In order to prevent the funds from being permanently locked should one party dis
 
 ![Initial Refund Transaction](http://aakselrod.github.io/refund-initial.svg "Initial Refund Transaction")
 
-Both Alice and Bob sign off on the refund transaction, which specifies that both parties get their money back at block 400,000 minus fees. If a finalized transaction that uses the contract output isn't broadcast before block 400,000, this refund transaction becomes valid to include in a block. In case either of the parties disappears right after the contract transaction is broadcast, the refund transaction can permit the other party to get their money back at nLockTime expiration.
+Both Alice and Bob sign off on the refund transaction, which specifies that both parties get their money back at block 400,000 minus fees. If a finalized version of the refund transaction that uses the contract output isn't confirmed before block 400,000, this refund transaction becomes valid to include in a block. In case either of the parties disappears right after the contract transaction is broadcast, the refund transaction can permit the other party to get their money back at nLockTime expiration.
 
 From this point, trade can take place between Alice and Bob off the blockchain by creating new versions of the refund transaction. In some situations described below, the new version of the refund transaction will need to have an earlier nLockTime to ensure that it can be mined before a previously-created refund transaction becomes valid. Off-chain trade between Alice and Bob can continue based on the contract until the version of the refund transaction with the earliest nLockTime becomes valid for inclusion in a block.
 
@@ -79,7 +90,7 @@ The new version has four differences from the original refund transaction:
 
 To make a subsequent payment in the same direction, it is only necessary to increase Bob's share of the refund and decrease Alice's. Alice can assume that Bob will only broadcast the version of the transaction with the highest possible share of the refund going to him. Thus, increasing the fee, incrementing the version, and decrementing nLockTime is only required when switching payment directions.
 
-### Escrowed Payments
+### Off Chain Payment with Escrow
 
 An [escrowed payment][TXCHAIN] is similar to a traditional payment. The difference is in the new version of the refund transaction: each output is encumbered not just with a required signature, but the same required hash preimage for both outputs. In this way, the party that knows the preimage can't redeem its output without enabling the other party to do the same.
 [TXCHAIN]: https://github.com/aakselrod/libtxchain-java
@@ -93,7 +104,7 @@ Since the payment flow is being reversed (instead of going from Alice to Bob, it
 
 When Alice delivers the goods, Bob tells her *P*, which means that she can redeem her output if she were to broadcast the new version of the refund transaction. If the refund transaction gets broadcast without Bob telling Alice *P*, she can learn it when he reveals it by redeeming his own output from the contract transaction. If Alice doesn't deliver the goods, Bob does not reveal *P* to Alice, and refuses to do any additional trade over the channel until Alice rolls back the escrow by sending a new (non-escrowed) payment for the 1 mBTC back to him.
 
-### Bets
+### Off Chain Bet
 
 With a [bet][BET], an oracle publishes a signed list of possible outcomes and an associated hash for each. Upon the occurrence of the event being wagered on, the oracle publishes the preimage for the hash corresponding to the outcome. One refund transaction similar to an escrow refund transaction is created for each possible outcome (except an optional default case). The new refund transactions must have an earlier nLockTime, higher version number, and higher fee than the most recent redeemable refund transaction. Cheating by the oracle can be detected if there exists any signed statement from which two or more conflicting preimages are known.
 [BET]: https://en.bitcoin.it/wiki/Off-Chain_Betting
@@ -144,15 +155,17 @@ Each node should publish a directory of the services it provides. The specificat
 
 This project aims to develop Raspberry Pi versions of these advanced services for cheap, low-powered, mass-producible meshnet nodes. This project also aims to develop corresponding client capability in an Android app, as well as an Android app with limited, configurable service functionality for users who want to run some services on their own portable devices. Commercial potential exists in more scalable implementations for "supernodes" of various services. This project will gladly accept open source patches for greater functionality, scalability, and platform compatibility; for example, running on a VPS, multicore dedicated server, or local datacenter-sized cluster. However, the focus is on making the technology accessible in remote locations and in developing nations, and using local, renewable, or cheaply mass-producible resources.
 
-### Distributed Instant Payments
+### Distributed Instant Payments and Exchanges
 
 Distributed instant payments take place over chains of trade channels using escrowed payments. Each node pays the next node in the chain using an escrowed payment, with each payment using the same hash. Once the entire path has allocated funds to the payment, the hash preimage is revealed to all nodes in the chain, committing the payment across the entire chain. Escrow is built in, as the revelation of the hash preimage can be delayed until performance by the ultimate payee is verified. Rollbacks are performed one by one, from the last node to get an escrowed payment back to the first.
 
 Routing information for trade channels that can be used for this purpose can be stored in the DHT. Fees can be charged based on a number of factors such as how long a trade channel will need to be reserved, how big a payment is, number of payments to make, etc. A tradeoff exists between low cost (fewer well-connected nodes acting as competitive transaction processors, shorter payment channel chains, and lower fees) vs. decentralization (more locally-connected nodes, longer chains, and higher fees). Both models could thrive: well-connected nodes would be more vulnerable to regulation, while locally-connected nodes would be better for transferring funds in a more private manner. The choice will be made by individual nodes who choose their interconnection partners.
 
+Since trade contracts can be created on any blockchain with support for scripting similar to that of Bitcoin, the distributed payment network can include altcoins and side chains. Trade contracts can also be established using colored coin outputs, permitting off blockchain trade of colored coins. It then becomes possible for the distributed payment network to act as a distributed cryptocurrency exchange as well. For example, a customer could pay with Litecoin and the merchant could automatically get paid with Bitcoin.
+
 ### Distributed Derivatives/Prediction Markets
 
-Each node that participates in a distributed derivatives/prediction market must maintain an internal order book and bet channels with multiple trading partners, acting as a parimutuel betting bookmaker. Market makers would seek to create connections to as many people as possible and maintain their positions to be as neutral as possible, locking in arbitrage profits and hedging against losses. Then, bet price/probability movements propagate from market actors who are hedging and speculating through market makers and to the rest of the market. Much like the instant payment scheme, there's a tradeoff between cost/efficiency and decentralization.
+Each node that participates in a distributed derivatives/prediction market must maintain an internal order book and bet channels with multiple trading partners, acting as a bookmaker. Market makers would seek to create connections to as many people as possible and maintain their positions to be as neutral as possible, locking in arbitrage profits and hedging against losses. Then, bet price/probability movements propagate from market actors who are hedging and speculating through market makers and to the rest of the market. Much like the instant payment scheme, there's a tradeoff between cost/efficiency and decentralization.
 
 This project aims to implement a basic distributed derivatives-based hedging client for Android and a specification for connecting to market makers in order to permit merchants to keep accounts in their preferred currency regardless of the currency being used for payments. Patches will be accepted for additional functionality.
 
@@ -176,7 +189,7 @@ Since streaming media across the network would cause the media to be stored in t
 
 ### Meshnets, Mixnets, and Virtual ISPs
 
-To pay an access point for a la carte bandwidth or access time, it's possible to create a trade channel with the AP and directly pay for each unit of bandwidth used over traditional micropayments. It's also possible to create a trade channel with just one node, and pay through that node to any AP which has a direct or indirect connection, thus turning that node into a virtual ISP.
+To pay an access point for metered bandwidth or access time, it's possible to create a trade channel with the AP and directly pay for each unit of bandwidth used over traditional micropayments. It's also possible to create a trade channel with just one node, and pay through that node to any AP which has a direct or indirect connection, thus turning that node into a virtual ISP.
 
 In a meshnet-style environment, each permanent or semi-permanent installation should have trade channels with all of its permanent or semi-permanent direct neighbors. Ephemeral clients can pay any AP in the meshnet through any node to which they have connectivity for bandwidth utilization and other network services (locally-relevant entries from the DHT which are cheaper to cache locally than request from a remote peer all the time, for example). These can interconnect over the Internet or other long-distance media, bridging both connectivity and trade gaps.
 
@@ -186,19 +199,11 @@ Onion routing can also be funded with trade channels. If a node wants to anonymo
 
 ### Outsourced Storage
 
-Much like Dropbox and Wuala permit outsourced storage, this service can be commoditized with an open API. Client-side encryption, regular requests for proof-of-stored-data via a Merkle branch, and client-defined redundancy can make private data in the public cloud a reality. This can even apply to publicly-accessible files and other data as it permits clients to ensure that their public data doesn't get deleted from the DHT for non-use.
+Much like Dropbox and Wuala permit outsourced storage, this service can be commoditized with an open API. Client-side encryption, regular requests for proof-of-stored-data via a Merkle branch, and client-defined redundancy can make private data in the public cloud a reality. This can even apply to publicly-accessible files and other data as it permits clients to ensure that their public data doesn't get deleted from the DHT for non-use. As blockchain technology continues to evolve, proof of storage blockchains may become possible and could be used for this feature.
 
 ### Crowdfunding and Performance Bonds
 
 One narrow application of a prediction market is a crowdfunded performance bond using a construct similar to a dominant assurance contract. To make this work, an oracle would commit to reveal the preimage to a hash when a project is completed, or reveal the preimage to another hash if the project isn't completed to its satisfaction by a specified time. Those working on the project would bet on its completion, while those wanting to fund the project bet against its completion. If the project isn't completed, the funders win their bet and make money; if the project is completed, those working on the project win their bet and get paid for their work.
-
-### Colored Coin and Inter-Blockchain Trading Off Chain
-
-It's possible to set up the initial trade channel contract using colored coins or altcoins. The benefits are the same. However, it's also possible to set up multiple channels and use escrow to enforce trade atomicity.
-
-As an example, two contracts are set up: one for Bitcoin using normal outputs, and one using colored coin outputs. An escrowed payment is then initiated from one user to the second on the Bitcoin channel, and an escrowed payment using the same hash is initiated from the second user to the first over the colored coin channel. Both payments then commit atomically when the preimage to the hash is revealed.
-
-It's possible to set this up to be transitive just as in the distributed instant payments scheme. It then becomes possible for a customer to pay with the currency or asset she has, and the merchant to automatically receive the currency or asset she wants, by going through one or more intermediary nodes which perform the exchange.
 
 ### Decentralized Supermarkets and Online Markets
 
